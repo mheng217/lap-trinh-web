@@ -1,241 +1,137 @@
-
 <?php
-$name = "Lê Văn Hào";
-$email = "haovanle@edu.vn";
-$subject = "Hỗ trợ kỹ thuật";
-$content = "";
+session_start();
+
+function e($v) { return htmlspecialchars($v, ENT_QUOTES, 'UTF-8'); }
+
+$subjects = ['Hỗ trợ kỹ thuật', 'Góp ý', 'Hợp tác', 'Khác'];
 $errors = [];
-$success = false;
+$data = ['name' => '', 'email' => '', 'subject' => $subjects[0], 'message' => ''];
 
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-    $name = trim($_POST["name"] ?? "");
-    $email = trim($_POST["email"] ?? "");
-    $subject = trim($_POST["subject"] ?? "");
-    $content = trim($_POST["content"] ?? "");
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $data['name']    = trim($_POST['name'] ?? '');
+  $data['email']   = trim($_POST['email'] ?? '');
+  $data['subject'] = $_POST['subject'] ?? '';
+  $data['message'] = trim($_POST['message'] ?? '');
 
-    if ($name === "") {
-        $errors["name"] = "Vui lòng nhập họ tên.";
+  // Họ tên + nội dung không rỗng
+  if ($data['name'] === '') $errors['name'] = 'Vui lòng nhập họ tên';
+
+  // Email đúng định dạng
+  if (!filter_var($data['email'], FILTER_VALIDATE_EMAIL))
+    $errors['email'] = 'Email không hợp lệ';
+
+  // Chủ đề phải nằm trong danh sách
+  if (!in_array($data['subject'], $subjects, true))
+    $errors['subject'] = 'Chủ đề không hợp lệ';
+
+  // Nội dung 10-500 ký tự
+  $len = mb_strlen($data['message'], 'UTF-8');
+  if ($data['message'] === '' || $len < 10 || $len > 500)
+    $errors['message'] = 'Nội dung phải từ 10 đến 500 ký tự.';
+
+  // Upload ảnh đại diện: 3 kiểm tra
+  $file = $_FILES['avatar'] ?? null;
+  $ext = null;
+  if (!$file || $file['error'] === UPLOAD_ERR_NO_FILE) {
+    $errors['avatar'] = 'Vui lòng chọn ảnh đại diện';          // (1) có chọn file
+  } elseif ($file['error'] !== UPLOAD_ERR_OK) {
+    $errors['avatar'] = 'Tải ảnh lên thất bại, hãy thử lại';    // (1) không lỗi upload
+  } elseif ($file['size'] > 2 * 1024 * 1024) {
+    $errors['avatar'] = 'Ảnh không được lớn hơn 2MB';           // (2) dung lượng
+  } else {
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    $mime = $finfo->file($file['tmp_name']);
+    $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif'];
+    if (!isset($allowed[$mime])) {
+      $errors['avatar'] = 'Chỉ chấp nhận ảnh JPG, PNG hoặc GIF'; // (3) loại file
+    } else {
+      $ext = $allowed[$mime];
     }
+  }
 
-    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $errors["email"] = "Email không hợp lệ.";
-    }
+  if (!$errors) {
+    if (!is_dir(__DIR__ . '/uploads')) mkdir(__DIR__ . '/uploads', 0755, true);
+    $newName = bin2hex(random_bytes(8)) . '.' . $ext;   // tên ngẫu nhiên, tránh trùng/độc hại
+    move_uploaded_file($file['tmp_name'], __DIR__ . '/uploads/' . $newName);
 
-    $validSubjects = ["Hỗ trợ kỹ thuật", "Góp ý", "Hợp tác", "Khác"];
-    if (!in_array($subject, $validSubjects, true)) {
-        $errors["subject"] = "Vui lòng chọn chủ đề.";
-    }
-
-    $length = mb_strlen($content, "UTF-8");
-    if ($length < 10 || $length > 500) {
-        $errors["content"] = "Nội dung phải từ 10 đến 500 ký tự.";
-    }
-
-    if (empty($errors)) {
-        $success = true;
-    }
+    $_SESSION['flash'] = 'Gửi liên hệ thành công. Cảm ơn bạn!';
+    header('Location: contact.php');
+    exit;
+  }
 }
-?>
 
+$flash = $_SESSION['flash'] ?? null;
+unset($_SESSION['flash']);
+?>
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Liên hệ</title>
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            padding: 20px;
-            background: #f1f3f5;
-            font-family: Arial, sans-serif;
-            color: #333;
-        }
-
-        .container {
-            max-width: 640px;
-            margin: 0 auto;
-            padding: 34px;
-            background: white;
-            border-radius: 15px;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            margin: 0 0 14px;
-            text-align: center;
-            color: #245b88;
-            font-size: 32px;
-        }
-
-        .description {
-            margin-bottom: 30px;
-            text-align: center;
-            color: #666;
-            font-size: 16px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-            font-size: 16px;
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #d5d5d5;
-            border-radius: 8px;
-            font-family: Arial, sans-serif;
-            font-size: 15px;
-            background: white;
-        }
-
-        input, select {
-            height: 44px;
-        }
-
-        textarea {
-            height: 135px;
-            resize: vertical;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: #3788d8;
-            box-shadow: 0 0 0 3px rgba(55, 136, 216, 0.15);
-        }
-
-        .invalid {
-            border-color: #ff5555;
-            background: #fff5f5;
-        }
-
-        .error {
-            display: block;
-            margin-top: 7px;
-            color: #f04444;
-            font-size: 13px;
-        }
-
-        button {
-            width: 100%;
-            padding: 13px;
-            border: none;
-            border-radius: 7px;
-            background: #2674b9;
-            color: white;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background: #1d619e;
-        }
-
-        .success {
-            margin-top: 20px;
-            padding: 12px;
-            border-radius: 7px;
-            background: #e8f7ed;
-            color: #218344;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Liên hệ</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f3f5f7; margin: 0; padding: 40px 16px; }
+    .card { max-width: 480px; margin: 0 auto; background: #fff; padding: 28px;
+            border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+    h1 { text-align: center; color: #1f4e79; margin: 0; }
+    .sub { text-align: center; color: #777; font-size: 14px; margin: 8px 0 20px; }
+    label { display: block; font-weight: bold; font-size: 14px; margin-top: 16px; }
+    input[type=text], select, textarea {
+      width: 100%; padding: 10px; margin-top: 6px; box-sizing: border-box;
+      border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    textarea { height: 130px; resize: vertical; }
+    .invalid { border-color: #e53935 !important; background: #fff5f5; }
+    .error { color: #d93025; font-size: 13px; margin-top: 4px; display: block; }
+    .success { background: #e6f4ea; color: #1e7e34; padding: 12px; border-radius: 6px; margin-bottom: 8px; }
+    button { width: 100%; margin-top: 20px; padding: 12px; border: 0; border-radius: 6px;
+             background: #1f6fb2; color: #fff; font-weight: bold; font-size: 15px; cursor: pointer; }
+    button:hover { background: #185a92; }
+  </style>
 </head>
-
 <body>
-
-<div class="container">
+  <div class="card">
     <h1>Liên hệ</h1>
-    <p class="description">
-        Vui lòng nhập đầy đủ thông tin bên dưới.
-    </p>
+    <p class="sub">Vui lòng nhập đầy đủ thông tin bên dưới.</p>
 
-    <form method="post">
-        <div class="form-group">
-            <label for="name">Họ tên</label>
-            <input
-                type="text"
-                id="name"
-                name="name"
-                value="<?= htmlspecialchars($name, ENT_QUOTES, 'UTF-8') ?>"
-                class="<?= isset($errors['name']) ? 'invalid' : '' ?>"
-            >
-            <?php if (isset($errors["name"])): ?>
-                <span class="error"><?= htmlspecialchars($errors["name"], ENT_QUOTES, 'UTF-8') ?></span>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input
-                type="text"
-                id="email"
-                name="email"
-                value="<?= htmlspecialchars($email, ENT_QUOTES, 'UTF-8') ?>"
-                class="<?= isset($errors['email']) ? 'invalid' : '' ?>"
-            >
-            <?php if (isset($errors["email"])): ?>
-                <span class="error"><?= htmlspecialchars($errors["email"], ENT_QUOTES, 'UTF-8') ?></span>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-group">
-            <label for="subject">Chủ đề</label>
-            <select id="subject" name="subject"
-                class="<?= isset($errors['subject']) ? 'invalid' : '' ?>">
-                <option value="Hỗ trợ kỹ thuật" <?= $subject === "Hỗ trợ kỹ thuật" ? "selected" : "" ?>>
-                    Hỗ trợ kỹ thuật
-                </option>
-                <option value="Góp ý" <?= $subject === "Góp ý" ? "selected" : "" ?>>
-                    Góp ý
-                </option>
-                <option value="Hợp tác" <?= $subject === "Hợp tác" ? "selected" : "" ?>>
-                    Hợp tác
-                </option>
-                <option value="Khác" <?= $subject === "Khác" ? "selected" : "" ?>>
-                    Khác
-                </option>
-            </select>
-            <?php if (isset($errors["subject"])): ?>
-                <span class="error"><?= htmlspecialchars($errors["subject"], ENT_QUOTES, 'UTF-8') ?></span>
-            <?php endif; ?>
-        </div>
-
-        <div class="form-group">
-            <label for="content">Nội dung</label>
-            <textarea
-                id="content"
-                name="content"
-                placeholder="Nhập nội dung liên hệ..."
-                class="<?= isset($errors['content']) ? 'invalid' : '' ?>"
-            ><?= htmlspecialchars($content, ENT_QUOTES, 'UTF-8') ?></textarea>
-
-            <?php if (isset($errors["content"])): ?>
-                <span class="error"><?= htmlspecialchars($errors["content"], ENT_QUOTES, 'UTF-8') ?></span>
-            <?php endif; ?>
-        </div>
-
-        <button type="submit">Gửi liên hệ</button>
-    </form>
-
-    <?php if ($success): ?>
-        <div class="success">
-            Gửi liên hệ thành công!
-        </div>
+    <?php if ($flash): ?>
+      <div class="success"><?= e($flash) ?></div>
     <?php endif; ?>
-</div>
 
+    <form method="post" enctype="multipart/form-data" novalidate>
+      <label>Họ tên
+        <input type="text" name="name" value="<?= e($data['name']) ?>"
+               class="<?= isset($errors['name']) ? 'invalid' : '' ?>">
+      </label>
+      <?php if (isset($errors['name'])): ?><span class="error"><?= e($errors['name']) ?></span><?php endif; ?>
+
+      <label>Email
+        <input type="text" name="email" value="<?= e($data['email']) ?>"
+               class="<?= isset($errors['email']) ? 'invalid' : '' ?>">
+      </label>
+      <?php if (isset($errors['email'])): ?><span class="error"><?= e($errors['email']) ?></span><?php endif; ?>
+
+      <label>Chủ đề
+        <select name="subject">
+          <?php foreach ($subjects as $s): ?>
+            <option value="<?= e($s) ?>" <?= $data['subject'] === $s ? 'selected' : '' ?>><?= e($s) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
+      <?php if (isset($errors['subject'])): ?><span class="error"><?= e($errors['subject']) ?></span><?php endif; ?>
+
+      <label>Nội dung
+        <textarea name="message" placeholder="Nhập nội dung liên hệ..."
+                  class="<?= isset($errors['message']) ? 'invalid' : '' ?>"><?= e($data['message']) ?></textarea>
+      </label>
+      <?php if (isset($errors['message'])): ?><span class="error"><?= e($errors['message']) ?></span><?php endif; ?>
+
+      <label>Ảnh đại diện
+        <input type="file" name="avatar" accept="image/jpeg,image/png,image/gif">
+      </label>
+      <?php if (isset($errors['avatar'])): ?><span class="error"><?= e($errors['avatar']) ?></span><?php endif; ?>
+
+      <button type="submit">Gửi liên hệ</button>
+    </form>
+  </div>
 </body>
 </html>

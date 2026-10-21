@@ -15,6 +15,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $errors["email"] = "Email không hợp lệ";
     }
+      if (!$errors) {
+    $_SESSION['student'] = $data;
+    header('Location: bai3-5.php');
+    exit;
 }
 ?>
 
@@ -49,8 +53,5 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         <button type="submit">Đăng ký</button>
     </form>
 
-    <?php if ($_SERVER["REQUEST_METHOD"] === "POST" && !$errors): ?>
-        <p style="color:green">Thông tin hợp lệ!</p>
-    <?php endif; ?>
 </body>
 </html>
